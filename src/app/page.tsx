@@ -65,7 +65,7 @@ export default function Home() {
         min={1}
         max={100}
         disabled={isRunning}
-        placeholder="Параллелизм"
+        placeholder="Parallelism"
       />
       <input
         type="number"
@@ -74,7 +74,7 @@ export default function Home() {
         min={1}
         max={100}
         disabled={isRunning}
-        placeholder="Запросов в секунду"
+        placeholder="Requests per second"
       />
       <button onClick={handleStart} disabled={isRunning}>
         Пуск
