@@ -1,95 +1,89 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client";
+
+import { useState, useRef } from "react";
 
 export default function Home() {
+  const [concurrency, setConcurrency] = useState<number>(10);
+  const [requestsPerSecond, setRequestsPerSecond] = useState<number>(10);
+  const [results, setResults] = useState<number[]>([]);
+  const [isRunning, setIsRunning] = useState<boolean>(false);
+  const requestCount = useRef<number>(1000);
+
+  const sendRequest = async (index: number) => {
+    try {
+      const response = await fetch(`/api?index=${index}`);
+      if (response.ok) {
+        const data = await response.json();
+        setResults((prev) => [...prev, data.index]);
+      } else if (response.status === 429) {
+        console.error("Server request limit exceeded");
+      }
+    } catch (error) {
+      console.error("Request error:", error);
+    }
+  };
+
+  const handleStart = async () => {
+    setIsRunning(true);
+    setResults([]);
+
+    const activeReqs: Promise<void>[] = [];
+    let completedReqs = 0;
+
+    const reqInterval = 1000 / requestsPerSecond;
+
+    const runRequests = async () => {
+      for (let i = 1; i <= requestCount.current; i++) {
+        if (activeReqs.length >= concurrency) {
+          await Promise.race(activeReqs);
+        }
+
+        const requestPromise = sendRequest(i).finally(() => {
+          activeReqs.splice(activeReqs.indexOf(requestPromise), 1);
+          completedReqs++;
+          if (completedReqs === requestCount.current) {
+            setIsRunning(false);
+          }
+        });
+
+        activeReqs.push(requestPromise);
+
+        await new Promise((resolve) => setTimeout(resolve, reqInterval));
+      }
+    };
+
+    runRequests();
+  };
+
   return (
-    <main className={styles.main}>
-      <div className={styles.description}>
-        <p>
-          Get started by editing&nbsp;
-          <code className={styles.code}>src/app/page.tsx</code>
-        </p>
-        <div>
-          <a
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className={styles.vercelLogo}
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
-      </div>
-
-      <div className={styles.center}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className={styles.grid}>
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Docs <span>-&gt;</span>
-          </h2>
-          <p>Find in-depth information about Next.js features and API.</p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Learn <span>-&gt;</span>
-          </h2>
-          <p>Learn about Next.js in an interactive course with&nbsp;quizzes!</p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Templates <span>-&gt;</span>
-          </h2>
-          <p>Explore starter templates for Next.js.</p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Deploy <span>-&gt;</span>
-          </h2>
-          <p>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+    <div>
+      <h1>Async req:</h1>
+      <input
+        type="number"
+        value={concurrency}
+        onChange={(e) => setConcurrency(Number(e.target.value))}
+        min={1}
+        max={100}
+        disabled={isRunning}
+        placeholder="Параллелизм"
+      />
+      <input
+        type="number"
+        value={requestsPerSecond}
+        onChange={(e) => setRequestsPerSecond(Number(e.target.value))}
+        min={1}
+        max={100}
+        disabled={isRunning}
+        placeholder="Запросов в секунду"
+      />
+      <button onClick={handleStart} disabled={isRunning}>
+        Пуск
+      </button>
+      <ul>
+        {results.map((result, index) => (
+          <li key={index}>{result}</li>
+        ))}
+      </ul>
+    </div>
   );
 }
